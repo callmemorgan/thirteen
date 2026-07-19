@@ -11,7 +11,8 @@
  * - Legal combos: single, pair, triple, quad, straight (3+ consecutive ranks, no 2s),
  *   pair-run (3+ consecutive pairs, no 2s).
  * - First round: the holder of the 3 of spades leads and the first combo must include it.
- * - A player may pass on one play and re-enter the same trick on a later play.
+ * - Passing locks a player out of the current trick by default (passLockout);
+ *   the optional re-entry variant lets passers jump back in after a later play.
  * - A trick ends when every active player except the current leader has passed;
  *   the leader then starts the next trick with any legal combo.
  * - Players finishing shed all cards and are ranked in order; the round ends when
@@ -56,9 +57,16 @@ export interface RulesConfig {
   instantWin: boolean;
   /** Penalty points for leftover 2s / bombs when the round ends (display only). */
   thoi2Scoring: boolean;
+  /** When true, passing locks a player out of the trick. When false, passers
+   *  may re-enter the same trick after someone else plays (Southern style). */
+  passLockout: boolean;
 }
 
-export const DEFAULT_RULES: RulesConfig = { instantWin: false, thoi2Scoring: false };
+export const DEFAULT_RULES: RulesConfig = {
+  instantWin: false,
+  thoi2Scoring: false,
+  passLockout: true,
+};
 
 export type GamePhase = 'dealing' | 'playing' | 'roundEnd' | 'gameEnd';
 

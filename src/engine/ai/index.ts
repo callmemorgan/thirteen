@@ -27,6 +27,15 @@ export function chooseMove(
   const hand = state.players[seat].hand;
   if (hand.length === 0) return { kind: 'pass' }; // defensive: a finished seat has no play
 
+  // Pass lockout: a seat that passed this trick may only pass again.
+  if (
+    state.rules.passLockout &&
+    state.trick.combo !== null &&
+    state.trick.passedSeats.includes(seat)
+  ) {
+    return { kind: 'pass' };
+  }
+
   const random = rng ?? defaultRng(state, seat);
   const analysis = analyzeHand(hand);
   const ctx = buildContext(state, seat);

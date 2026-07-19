@@ -6,6 +6,7 @@
  * SSR-safe: no browser APIs at render time.
  */
 import { motion } from 'motion/react';
+import type { RulesConfig } from '../../engine/types';
 import { cardBackById, feltThemeById, themeCssVars } from '../themes';
 import { RulesOverlay } from './Overlays';
 
@@ -14,6 +15,7 @@ const FAN_ROTATIONS = [-16, 0, 16];
 export function SplashScreen({
   themeId,
   cardBackId,
+  rules,
   rulesOpen,
   onPlay,
   onRules,
@@ -22,6 +24,7 @@ export function SplashScreen({
 }: {
   themeId: string;
   cardBackId: string;
+  rules: RulesConfig;
   rulesOpen: boolean;
   onPlay: () => void;
   onRules: () => void;
@@ -87,7 +90,7 @@ export function SplashScreen({
           Settings
         </button>
       </motion.div>
-      {rulesOpen && <RulesOverlay onClose={onCloseRules} />}
+      {rulesOpen && <RulesOverlay rules={rules} onClose={onCloseRules} />}
     </div>
   );
 }

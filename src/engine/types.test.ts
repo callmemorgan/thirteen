@@ -9,7 +9,11 @@ describe('engine contracts', () => {
     expect(RANKS[12]).toBe(15);
   });
 
-  it('ships optional rule flags disabled by default', () => {
-    expect(DEFAULT_RULES).toEqual({ instantWin: false, thoi2Scoring: false });
+  it('ships the default rules: gambling options off, pass lockout on', () => {
+    expect(DEFAULT_RULES).toEqual({
+      instantWin: false,
+      thoi2Scoring: false,
+      passLockout: true,
+    });
   });
 });

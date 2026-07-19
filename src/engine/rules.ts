@@ -114,7 +114,8 @@ function handCombos(hand: Card[]): Combo[] {
  * - Leading (trick.combo === null): any legal combo from hand; pass NOT allowed.
  * - Following: only combos that beat trick.combo (see combos.beats), or pass.
  * - First round, opening play: the play must include the 3 of spades.
- * A player who passed earlier in the trick may play again (southern-style re-entry).
+ * With pass lockout (rules.passLockout, the default) a player who passed sits out
+ * the rest of the trick; otherwise re-entry is allowed (Southern style).
  */
 export function legalPlays(state: GameState, seat: number): Move[] {
   if (state.phase !== 'playing') return [];
@@ -125,6 +126,11 @@ export function legalPlays(state: GameState, seat: number): Move[] {
 
   const target = state.trick.combo;
   const openingPlay = state.isFirstRound && !state.openingPlayMade;
+
+  // Pass lockout: a seat that passed this trick stays out until the next one.
+  if (state.rules.passLockout && target !== null && state.trick.passedSeats.includes(seat)) {
+    return [{ kind: 'pass' }];
+  }
 
   const moves: Move[] = [];
   for (const combo of handCombos(player.hand)) {

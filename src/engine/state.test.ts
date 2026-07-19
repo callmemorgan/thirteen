@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Card, Combo, GameEvent, GameState, Move, Rank, Suit, TrickState } from './types';
+import type { Card, Combo, GameEvent, GameState, Move, Rank, RulesConfig, Suit, TrickState } from './types';
 import { DEFAULT_RULES } from './types';
 import { compareCards, sameCard } from './cards';
 import { classifyCombo } from './combos';
@@ -32,6 +32,7 @@ interface RigOptions {
   openingPlayMade?: boolean;
   finishedSeats?: number[];
   phase?: GameState['phase'];
+  rules?: Partial<RulesConfig>;
 }
 
 /** Build a rigged state; hands are sorted for the PlayerState contract. */
@@ -54,7 +55,7 @@ function rig(options: RigOptions): GameState {
     trick: options.trick ?? { combo: null, leaderSeat: currentSeat, passedSeats: [] },
     isFirstRound: options.isFirstRound ?? false,
     openingPlayMade: options.openingPlayMade ?? true,
-    rules: { ...DEFAULT_RULES },
+    rules: { ...DEFAULT_RULES, ...options.rules },
     seed: 0,
   };
 }
@@ -135,7 +136,7 @@ describe('createGame', () => {
       playerNames: ['A', 'B', 'C', 'D'],
       botDifficulties: ['easy', null, 'hard', 'medium'],
     });
-    expect(state.rules).toEqual({ instantWin: true, thoi2Scoring: false });
+    expect(state.rules).toEqual({ instantWin: true, thoi2Scoring: false, passLockout: true });
     expect(state.players.map((p) => p.name)).toEqual(['A', 'B', 'C', 'D']);
     expect(state.players.map((p) => p.difficulty)).toEqual(['easy', null, 'hard', 'medium']);
   });
@@ -172,6 +173,7 @@ describe('applyMove: pass and re-entry', () => {
         [c(8), d(12)],
       ],
       currentSeat: 0,
+      rules: { passLockout: false },
     });
 
     // Seat 0 leads the 7♠.
@@ -206,6 +208,52 @@ describe('applyMove: pass and re-entry', () => {
     expect(result.state.currentSeat).toBe(1);
     expect(isLegalMove(result.state, 1, { kind: 'play', cards: [h(8)] })).toBe(true);
     expect(isLegalMove(result.state, 1, { kind: 'pass' })).toBe(true);
+  });
+});
+
+describe('applyMove: pass lockout (default rules)', () => {
+  it('locks passers out until the trick ends, then frees them', () => {
+    const state = rig({
+      hands: [
+        [c(4), s(4), s(7), h(13)],
+        [d(12)],
+        [h(7), s(10)],
+        [c(8), d(9)],
+      ],
+      currentSeat: 0,
+    });
+
+    // Seat 0 leads the 7♠; seat 1 passes; seats 2, 3 and 0 keep topping the combo.
+    let result = applyMove(state, { kind: 'play', cards: [s(7)] });
+    result = applyMove(result.state, { kind: 'pass' });
+    expect(result.state.trick.passedSeats).toEqual([1]);
+
+    for (const cards of [[h(7)], [c(8)], [h(13)]]) {
+      result = applyMove(result.state, { kind: 'play', cards });
+      // Lockout: seat 1's pass stands against each new, higher combo.
+      expect(result.state.trick.passedSeats).toEqual([1]);
+    }
+
+    // Seat 1's turn with the trick still open: locked out — pass is the only move.
+    expect(result.state.currentSeat).toBe(1);
+    expect(legalPlays(result.state, 1)).toEqual([{ kind: 'pass' }]);
+    expect(isLegalMove(result.state, 1, { kind: 'play', cards: [d(12)] })).toBe(false);
+
+    // Seat 1 passes (recorded once), then seats 2 and 3 pass: the trick closes.
+    result = applyMove(result.state, { kind: 'pass' });
+    expect(result.state.trick.passedSeats).toEqual([1]);
+    result = applyMove(result.state, { kind: 'pass' });
+    result = applyMove(result.state, { kind: 'pass' });
+    expect(result.events).toEqual([
+      { type: 'passed', seat: 3 },
+      { type: 'trickWon', seat: 0 },
+    ]);
+    expect(result.state.trick).toEqual({ combo: null, leaderSeat: 0, passedSeats: [] });
+
+    // Seat 0 leads the next trick; seat 1 may contest it again.
+    result = applyMove(result.state, { kind: 'play', cards: [s(4)] });
+    expect(result.state.currentSeat).toBe(1);
+    expect(isLegalMove(result.state, 1, { kind: 'play', cards: [d(12)] })).toBe(true);
   });
 });
 

@@ -209,8 +209,13 @@ class EngineController implements GameController {
     if (combo === null) return 'Not a valid combination';
     const { state } = this.snapshot;
     const target = state.trick.combo;
-    if (target !== null && !beats(combo, target)) {
-      return `Doesn't beat ${comboLabel(target)}`;
+    if (target !== null) {
+      if (state.rules.passLockout && state.trick.passedSeats.includes(0)) {
+        return 'You passed — wait for the next trick';
+      }
+      if (!beats(combo, target)) {
+        return `Doesn't beat ${comboLabel(target)}`;
+      }
     }
     if (
       state.isFirstRound &&

@@ -12,7 +12,7 @@ npm run dev        # → http://localhost:5173
 
 Pin a reproducible deal with a seed: `http://localhost:5173/?seed=42`.
 
-## Rules (casual Southern style)
+## Rules (casual style)
 
 - 4 players, 13 cards each. Rank order `3 < … < A < 2`; suit tiebreak `♠ < ♣ < ♦ < ♥`.
 - Combos: single, pair, triple, quad, straight (3+ consecutive, no 2s),
@@ -20,7 +20,8 @@ Pin a reproducible deal with a seed: `http://localhost:5173/?seed=42`.
 - Chops: a quad or 3-pair-run beats a single 2; a 4-pair-run beats a pair of 2s,
   a quad, or a 3-pair-run.
 - First round: the 3♠ holder leads and must include it. Rematch winner leads.
-- Pass and re-enter the same trick later; trick ends when the other three pass.
+- Pass and you sit out the trick; it ends when the other three pass, and you rejoin
+  on the next lead. (Southern-style re-entry after passing is a Settings option.)
 - Optional flags in Settings: instant win (four 2s / 12-card dragon straight) and
   thối 2 penalties (points for leftover 2s and bombs shown in the summary).
 

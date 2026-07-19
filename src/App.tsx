@@ -84,6 +84,7 @@ export default function App() {
     <SplashScreen
       themeId={themeSettings.themeId}
       cardBackId={themeSettings.cardBackId}
+      rules={pendingConfig.rules}
       rulesOpen={rulesOpen}
       onPlay={handlePlay}
       onRules={() => setRulesOpen(true)}

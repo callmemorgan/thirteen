@@ -55,7 +55,7 @@ describe('integration: instant win through the controller', () => {
     const controller = createController({
       playerName: 'You',
       botDifficulties: ['easy', 'easy', 'easy'],
-      rules: { instantWin: true, thoi2Scoring: false },
+      rules: { instantWin: true, thoi2Scoring: false, passLockout: true },
       seed,
     });
     const { state } = controller.getSnapshot();
@@ -67,7 +67,7 @@ describe('integration: instant win through the controller', () => {
     const controller = createController({
       playerName: 'You',
       botDifficulties: ['easy', 'easy', 'easy'],
-      rules: { instantWin: true, thoi2Scoring: false },
+      rules: { instantWin: true, thoi2Scoring: false, passLockout: true },
       seed: 1,
     });
     expect(controller.getSnapshot().state.phase).toBe('playing');

@@ -128,7 +128,10 @@ export function applyMove(
 
 function applyPass(state: GameState, seat: number): { state: GameState; events: GameEvent[] } {
   const events: GameEvent[] = [{ type: 'passed', seat }];
-  const passedSeats = [...state.trick.passedSeats, seat];
+  // Under pass lockout an already-passed seat passes again every turn — record it once.
+  const passedSeats = state.trick.passedSeats.includes(seat)
+    ? state.trick.passedSeats
+    : [...state.trick.passedSeats, seat];
 
   // The trick closes once every active seat except the leader has passed. When the
   // leader has gone out mid-trick, they are no longer active, so every active seat
@@ -199,12 +202,17 @@ function applyPlay(
   const events: GameEvent[] = [{ type: 'played', seat, combo, chop }];
   if (wentOut) events.push({ type: 'playerOut', seat, place });
 
-  // A play always replaces the table combo and clears the passes against the old
-  // one — players who passed may contest the new, higher combo (re-entry).
+  // A play always replaces the table combo. Under re-entry rules the passes
+  // against the old combo are cleared; under pass lockout they stand — a
+  // passer is out until someone sweeps and leads a fresh trick.
   const nextState: GameState = {
     ...state,
     players,
-    trick: { combo, leaderSeat: seat, passedSeats: [] },
+    trick: {
+      combo,
+      leaderSeat: seat,
+      passedSeats: state.rules.passLockout ? state.trick.passedSeats : [],
+    },
     openingPlayMade: true,
   };
 

@@ -200,6 +200,23 @@ export function SettingsPanel({
           <span className="toggle-label">{config.rules.thoi2Scoring ? 'On' : 'Off'}</span>
         </button>
       </section>
+      <section className="settings-section settings-row">
+        <h3>Lock out after pass</h3>
+        <button
+          type="button"
+          className={`toggle${config.rules.passLockout ? ' is-on' : ''}`}
+          role="switch"
+          aria-checked={config.rules.passLockout}
+          onClick={() =>
+            onConfigChange({
+              rules: { ...config.rules, passLockout: !config.rules.passLockout },
+            })
+          }
+        >
+          <span className="toggle-knob" />
+          <span className="toggle-label">{config.rules.passLockout ? 'On' : 'Off'}</span>
+        </button>
+      </section>
       {configNote !== undefined && <p className="settings-note">{configNote}</p>}
       <section className="settings-section">
         <h3>Table felt</h3>
@@ -282,7 +299,7 @@ export function SettingsOverlay({
 // Rules
 // ---------------------------------------------------------------------------
 
-export function RulesOverlay({ onClose }: { onClose: () => void }) {
+export function RulesOverlay({ rules, onClose }: { rules: RulesConfig; onClose: () => void }) {
   return (
     <Modal title="How to play Tiến Lén" onClose={onClose} testId="overlay-rules">
       <div className="rules">
@@ -318,7 +335,11 @@ export function RulesOverlay({ onClose }: { onClose: () => void }) {
           <h3>Flow</h3>
           <ul>
             <li>The 3♠ holder opens; the first play must include it</li>
-            <li>Pass to skip — you may jump back in later in the same trick</li>
+            {rules.passLockout ? (
+              <li>Pass and you sit out the trick — you rejoin when someone sweeps and leads</li>
+            ) : (
+              <li>Pass to skip — you may jump back in later in the same trick</li>
+            )}
             <li>When everyone else passes, the last player sweeps the trick and leads</li>
           </ul>
         </section>

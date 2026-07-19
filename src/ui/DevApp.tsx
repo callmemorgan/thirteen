@@ -288,7 +288,9 @@ export default function DevApp({
             onClose={() => setOverlay(null)}
           />
         )}
-        {overlay === 'rules' && <RulesOverlay key="rules" onClose={() => setOverlay(null)} />}
+        {overlay === 'rules' && (
+          <RulesOverlay key="rules" rules={state.rules} onClose={() => setOverlay(null)} />
+        )}
       </AnimatePresence>
     </div>
   );
