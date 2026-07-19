@@ -5,6 +5,8 @@
  *
  * Works against the real engine: waits for the human turn (a bot may hold
  * the 3♠ and lead), then plays via the Hint button so any deal is handled.
+ * Also asserts pass lockout live: once the human passes, Play/Pass/Hint must
+ * stay disabled until the trick is swept (their turn is skipped, not re-offered).
  *
  * Usage: node scripts/visual-qa.mjs
  */
@@ -74,6 +76,31 @@ async function takeHintedTurn(page) {
   return 'passed';
 }
 
+/**
+ * Pass lockout assertion: while the human's "Pass" chip is up (they passed and
+ * the trick is still open), Play/Pass/Hint must stay disabled — their turn is
+ * skipped until someone sweeps and leads a fresh trick. Sort is exempt: it only
+ * rearranges the hand and is allowed anytime.
+ */
+async function assertLockoutHolds(page) {
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    const status = await page.evaluate(() => {
+      if (document.querySelector('.player-plate .pass-chip') === null) return 'unlocked';
+      const enabled = [...document.querySelectorAll('.action-buttons button')]
+        .filter((b) => ['Play', 'Pass', 'Hint'].includes(b.textContent) && !b.disabled)
+        .map((b) => b.textContent);
+      return enabled.length === 0 ? 'locked' : `enabled: ${enabled.join(', ')}`;
+    });
+    if (status === 'unlocked') return; // trick swept — lockout over
+    if (status !== 'locked') {
+      errors.push(`[lockout] turn returned after passing (${status})`);
+      return;
+    }
+    await page.waitForTimeout(200);
+  }
+}
+
 let browser;
 try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -107,8 +134,31 @@ try {
   await page.waitForTimeout(900);
   await shot(page, `04-desktop-${outcome}`);
 
+  // Pass lockout: seek a human pass, then assert the turn never comes back
+  // while the trick is still open (see assertLockoutHolds).
+  let lockoutChecked = false;
+  if (outcome === 'passed') {
+    await assertLockoutHolds(page);
+    lockoutChecked = true;
+  }
+
   await page.waitForTimeout(6000); // let bots take turns
   await shot(page, '05-desktop-midgame');
+
+  for (let turn = 0; turn < 6 && !lockoutChecked; turn++) {
+    try {
+      await waitForHumanTurn(page);
+    } catch {
+      break; // round over or the human went out
+    }
+    if ((await takeHintedTurn(page)) === 'passed') {
+      await assertLockoutHolds(page);
+      lockoutChecked = true;
+    }
+  }
+  if (!lockoutChecked) {
+    console.log('note: human never passed this deal — lockout path not exercised');
+  }
 
   await page.getByTestId('settings-button').click();
   await page.waitForTimeout(300);

@@ -464,11 +464,13 @@ class MockController implements GameController {
       };
     }
 
+    // Under pass lockout, seats that passed this trick are skipped in the rotation.
+    const lockedOut = state.rules.passLockout ? trick.passedSeats : [];
     const order = [0, 1, 2, 3];
     let seat = state.currentSeat;
     do {
       seat = order[(seat + 1) % 4];
-    } while (!active.includes(seat));
+    } while (!active.includes(seat) || lockedOut.includes(seat));
     return { ...state, currentSeat: seat };
   }
 

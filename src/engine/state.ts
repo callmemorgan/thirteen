@@ -44,11 +44,15 @@ function cardKey(card: Card): string {
   return `${card.rank}:${card.suit}`;
 }
 
-/** Next non-finished seat in rotation order 0→1→2→3→0 after `from`. */
-function nextActiveSeat(players: PlayerState[], from: number): number {
+/** Next seat in rotation order 0→1→2→3→0 after `from` that is neither finished nor skipped. */
+function nextActiveSeat(
+  players: PlayerState[],
+  from: number,
+  skipSeats: readonly number[] = [],
+): number {
   for (let step = 1; step <= players.length; step++) {
     const seat = (from + step) % players.length;
-    if (!players[seat].finished) return seat;
+    if (!players[seat].finished && !skipSeats.includes(seat)) return seat;
   }
   return from;
 }
@@ -110,9 +114,10 @@ export function createGame(config: GameConfig = {}): GameState {
 
 /**
  * Apply a legal move and return the next state plus transient events for UI/SFX.
- * Throws on an illegal move. Handles: turn rotation (skipping finished players),
- * pass/re-entry, trick completion (trickWon), player finishes (playerOut), and
- * round end when three players are out (roundEnd + gameEnd).
+ * Throws on an illegal move. Handles: turn rotation (skipping finished players and,
+ * under pass lockout, seats that passed this trick), pass/re-entry, trick completion
+ * (trickWon), player finishes (playerOut), and round end when three players are out
+ * (roundEnd + gameEnd).
  */
 export function applyMove(
   state: GameState,
@@ -130,7 +135,8 @@ export function applyMove(
 
 function applyPass(state: GameState, seat: number): { state: GameState; events: GameEvent[] } {
   const events: GameEvent[] = [{ type: 'passed', seat }];
-  // Under pass lockout an already-passed seat passes again every turn — record it once.
+  // Rotation skips locked-out seats, so a seat never passes twice; keep the
+  // dedup as a guard.
   const passedSeats = state.trick.passedSeats.includes(seat)
     ? state.trick.passedSeats
     : [...state.trick.passedSeats, seat];
@@ -147,7 +153,13 @@ function applyPass(state: GameState, seat: number): { state: GameState; events: 
     return {
       state: {
         ...state,
-        currentSeat: nextActiveSeat(state.players, seat),
+        // Under pass lockout, seats that already passed this trick are skipped —
+        // a pass locks you out until someone sweeps and leads a fresh trick.
+        currentSeat: nextActiveSeat(
+          state.players,
+          seat,
+          state.rules.passLockout ? passedSeats : [],
+        ),
         trick: { ...state.trick, passedSeats },
       },
       events,
@@ -235,8 +247,40 @@ function applyPlay(
     };
   }
 
+  // Under pass lockout a play can decide the trick on the spot: when every other
+  // active seat has already passed, nobody is left who could top the combo.
+  const decided =
+    state.rules.passLockout &&
+    players.every(
+      (player) =>
+        player.finished ||
+        player.id === seat ||
+        state.trick.passedSeats.includes(player.id),
+    );
+  if (decided) {
+    events.push({ type: 'trickWon', seat });
+    // If the winner went out, the lead passes to the next active seat after them.
+    const nextLeader = players[seat].finished ? nextActiveSeat(players, seat) : seat;
+    return {
+      state: {
+        ...nextState,
+        currentSeat: nextLeader,
+        trick: { combo: null, leaderSeat: nextLeader, passedSeats: [] },
+      },
+      events,
+    };
+  }
+
   return {
-    state: { ...nextState, currentSeat: nextActiveSeat(players, seat) },
+    state: {
+      ...nextState,
+      // Under pass lockout the rotation skips seats that passed earlier this trick.
+      currentSeat: nextActiveSeat(
+        players,
+        seat,
+        state.rules.passLockout ? state.trick.passedSeats : [],
+      ),
+    },
     events,
   };
 }

@@ -234,15 +234,15 @@ describe('applyMove: pass lockout (default rules)', () => {
       expect(result.state.trick.passedSeats).toEqual([1]);
     }
 
-    // Seat 1's turn with the trick still open: locked out — pass is the only move.
-    expect(result.state.currentSeat).toBe(1);
-    expect(legalPlays(result.state, 1)).toEqual([{ kind: 'pass' }]);
+    // Seat 1 is locked out, so the rotation skips it entirely: after seat 0's
+    // play the turn goes straight to seat 2, and seat 1 has no moves at all.
+    expect(result.state.currentSeat).toBe(2);
+    expect(legalPlays(result.state, 1)).toEqual([]);
     expect(isLegalMove(result.state, 1, { kind: 'play', cards: [d(12)] })).toBe(false);
 
-    // Seat 1 passes (recorded once), then seats 2 and 3 pass: the trick closes.
+    // Seats 2 and 3 pass: the trick closes without seat 1 acting again.
     result = applyMove(result.state, { kind: 'pass' });
-    expect(result.state.trick.passedSeats).toEqual([1]);
-    result = applyMove(result.state, { kind: 'pass' });
+    expect(result.state.trick.passedSeats).toEqual([1, 2]);
     result = applyMove(result.state, { kind: 'pass' });
     expect(result.events).toEqual([
       { type: 'passed', seat: 3 },
@@ -254,6 +254,34 @@ describe('applyMove: pass lockout (default rules)', () => {
     result = applyMove(result.state, { kind: 'play', cards: [s(4)] });
     expect(result.state.currentSeat).toBe(1);
     expect(isLegalMove(result.state, 1, { kind: 'play', cards: [d(12)] })).toBe(true);
+  });
+
+  it('wins the trick on the spot when every other active seat has passed', () => {
+    const state = rig({
+      hands: [[s(3), s(5), s(9)], [d(12)], [c(12)], [s(4)]],
+      currentSeat: 0,
+    });
+
+    // Seat 0 leads; seats 1 and 2 pass; seat 3 tops it with their last card.
+    let result = applyMove(state, { kind: 'play', cards: [s(3)] });
+    result = applyMove(result.state, { kind: 'pass' });
+    result = applyMove(result.state, { kind: 'pass' });
+    result = applyMove(result.state, { kind: 'play', cards: [s(4)] });
+    expect(result.events).toEqual([
+      { type: 'played', seat: 3, combo: comboOf([s(4)]), chop: false },
+      { type: 'playerOut', seat: 3, place: 1 },
+    ]);
+    expect(result.state.currentSeat).toBe(0);
+
+    // Seat 0 tops it: seats 1 and 2 are locked out and seat 3 is finished, so
+    // the trick is decided immediately — no extra pass turns for anyone.
+    result = applyMove(result.state, { kind: 'play', cards: [s(5)] });
+    expect(result.events).toEqual([
+      { type: 'played', seat: 0, combo: comboOf([s(5)]), chop: false },
+      { type: 'trickWon', seat: 0 },
+    ]);
+    expect(result.state.trick).toEqual({ combo: null, leaderSeat: 0, passedSeats: [] });
+    expect(result.state.currentSeat).toBe(0);
   });
 });
 
