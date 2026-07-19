@@ -3,7 +3,7 @@ import type { Card, Combo, GameEvent, GameState, Move, Rank, RulesConfig, Suit, 
 import { DEFAULT_RULES } from './types';
 import { compareCards, sameCard } from './cards';
 import { classifyCombo } from './combos';
-import { applyMove, createGame } from './state';
+import { applyMove, createGame, sweepTrick } from './state';
 import { isLegalMove, legalPlays } from './rules';
 
 const card = (rank: Rank, suit: Suit): Card => ({ rank, suit });
@@ -55,6 +55,7 @@ function rig(options: RigOptions): GameState {
     trick: options.trick ?? { combo: null, leaderSeat: currentSeat, passedSeats: [] },
     isFirstRound: options.isFirstRound ?? false,
     openingPlayMade: options.openingPlayMade ?? true,
+    instantWinner: null,
     rules: { ...DEFAULT_RULES, ...options.rules },
     seed: 0,
   };
@@ -248,6 +249,16 @@ describe('applyMove: pass lockout (default rules)', () => {
       { type: 'passed', seat: 3 },
       { type: 'trickWon', seat: 0 },
     ]);
+    // The winning combo lingers on the table until the trick is swept.
+    expect(result.state.phase).toBe('trickWon');
+    expect(result.state.trick).toEqual({
+      combo: comboOf([h(13)]),
+      leaderSeat: 0,
+      passedSeats: [1, 2, 3],
+    });
+
+    result = sweepTrick(result.state);
+    expect(result.state.phase).toBe('playing');
     expect(result.state.trick).toEqual({ combo: null, leaderSeat: 0, passedSeats: [] });
 
     // Seat 0 leads the next trick; seat 1 may contest it again.
@@ -280,6 +291,19 @@ describe('applyMove: pass lockout (default rules)', () => {
       { type: 'played', seat: 0, combo: comboOf([s(5)]), chop: false },
       { type: 'trickWon', seat: 0 },
     ]);
+    // The decided trick lingers with the winning combo on the table, and nobody
+    // may act until it is swept.
+    expect(result.state.phase).toBe('trickWon');
+    expect(result.state.trick).toEqual({
+      combo: comboOf([s(5)]),
+      leaderSeat: 0,
+      passedSeats: [1, 2],
+    });
+    expect(result.state.currentSeat).toBe(0);
+    expect(legalPlays(result.state, 0)).toEqual([]);
+
+    result = sweepTrick(result.state);
+    expect(result.state.phase).toBe('playing');
     expect(result.state.trick).toEqual({ combo: null, leaderSeat: 0, passedSeats: [] });
     expect(result.state.currentSeat).toBe(0);
   });
@@ -302,6 +326,16 @@ describe('applyMove: trick completion', () => {
       { type: 'passed', seat: 3 },
       { type: 'trickWon', seat: 0 },
     ]);
+    expect(result.state.phase).toBe('trickWon');
+    expect(result.state.trick).toEqual({
+      combo: comboOf([s(7)]),
+      leaderSeat: 0,
+      passedSeats: [1, 2, 3],
+    });
+    expect(result.state.currentSeat).toBe(0);
+
+    result = sweepTrick(result.state);
+    expect(result.state.phase).toBe('playing');
     expect(result.state.trick).toEqual({ combo: null, leaderSeat: 0, passedSeats: [] });
     expect(result.state.currentSeat).toBe(0);
   });
@@ -328,7 +362,14 @@ describe('applyMove: trick completion', () => {
       { type: 'passed', seat: 3 },
       { type: 'trickWon', seat: 0 },
     ]);
-    // Seat 0 is out, so seat 1 inherits the lead.
+    expect(result.state.phase).toBe('trickWon');
+    // The winning pair stays on the table; seat 0 is out, so seat 1 inherits
+    // the lead once the trick is swept.
+    expect(result.state.trick.combo).toEqual(comboOf([s(7), h(7)]));
+    expect(result.state.currentSeat).toBe(1);
+
+    result = sweepTrick(result.state);
+    expect(result.state.phase).toBe('playing');
     expect(result.state.trick).toEqual({ combo: null, leaderSeat: 1, passedSeats: [] });
     expect(result.state.currentSeat).toBe(1);
   });
@@ -481,7 +522,13 @@ describe('scripted full game', () => {
     let lastEvents: GameEvent[] = [];
     let steps = 0;
 
-    while (state.phase === 'playing' && steps < 1000) {
+    while (state.phase === 'playing' || state.phase === 'trickWon') {
+      if (++steps > 1000) break;
+      if (state.phase === 'trickWon') {
+        // The controller would sweep on a timer; the scripted game sweeps directly.
+        state = sweepTrick(state).state;
+        continue;
+      }
       const seat = state.currentSeat;
       // The turn always belongs to an active seat with at least one legal move.
       expect(state.players[seat].finished).toBe(false);
@@ -509,7 +556,6 @@ describe('scripted full game', () => {
       }
 
       state = result.state;
-      steps++;
     }
 
     expect(steps).toBeLessThan(1000);

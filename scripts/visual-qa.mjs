@@ -194,8 +194,53 @@ try {
   await ctx.close();
 }
 
-await browser.close();
+// --- Settings persistence (rule flags survive a reload) --------------------
+{
+  const { ctx, page } = await newPage(browser, { viewport: { width: 1280, height: 800 } });
+  const instantWinSwitch = (p) =>
+    p.locator('.settings-section', { hasText: 'Instant win' }).getByRole('switch');
 
+  await page.goto(BASE, { waitUntil: 'load' });
+  await page.getByTestId('splash-settings-button').click();
+  await instantWinSwitch(page).click();
+  if ((await instantWinSwitch(page).getAttribute('aria-checked')) !== 'true') {
+    errors.push('[persistence] instant-win toggle did not turn on');
+  }
+
+  await page.reload({ waitUntil: 'load' });
+  await page.getByTestId('splash-settings-button').click();
+  if ((await instantWinSwitch(page).getAttribute('aria-checked')) !== 'true') {
+    errors.push('[persistence] instant-win flag did not survive a reload');
+  }
+  await instantWinSwitch(page).click(); // restore defaults for later runs
+  await ctx.close();
+}
+
+// --- Instant-win fanfare (seeded deal, instantWin rule toggled on) ----------
+// Seed 653 deals seat 0 an instant win (found by scanning createGame deals).
+{
+  const { ctx, page } = await newPage(browser, { viewport: { width: 1280, height: 800 } });
+  await page.goto(`${BASE}/?seed=653`, { waitUntil: 'load' });
+  await page.getByTestId('splash-settings-button').click();
+  await page.waitForTimeout(300);
+  await page
+    .locator('.settings-section', { hasText: 'Instant win' })
+    .getByRole('switch')
+    .click();
+  await page.getByTestId('settings-back').click();
+  await page.waitForTimeout(200);
+
+  await page.getByTestId('play-button').click();
+  await page.waitForTimeout(900); // fanfare entrance animation
+  await shot(page, '11-desktop-fanfare');
+
+  // The fanfare auto-dismisses (~2.8 s) and the summary + match score take over.
+  await page.waitForTimeout(2600);
+  await shot(page, '12-desktop-fanfare-summary');
+  await ctx.close();
+}
+
+await browser.close();
 if (errors.length) {
   console.error(`CONSOLE/PAGE ERRORS (${errors.length}):\n${errors.join('\n')}`);
   process.exit(1);

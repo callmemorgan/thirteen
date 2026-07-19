@@ -90,6 +90,7 @@ export function makeState(options: StateOptions): GameState {
     },
     isFirstRound: options.isFirstRound ?? false,
     openingPlayMade: options.openingPlayMade ?? true,
+    instantWinner: null,
     rules: DEFAULT_RULES,
     seed: options.seed ?? 42,
   };

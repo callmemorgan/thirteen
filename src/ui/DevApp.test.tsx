@@ -6,9 +6,43 @@
  */
 import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
+import type { GameState } from '../engine/types';
+import { DEFAULT_RULES } from '../engine/types';
+import { applyInstantWin, createGame } from '../engine/state';
+import type { ControllerSnapshot, GameController } from '../game/api';
 import DevApp from './DevApp';
 
 const html = renderToString(<DevApp />);
+
+/** A fixed-state controller stub for rendering specific phases SSR-side. */
+function stubController(state: GameState, matchScore: number[] = [0, 0, 0, 0]): GameController {
+  const snapshot: ControllerSnapshot = {
+    state,
+    config: {
+      playerName: 'You',
+      botDifficulties: ['easy', 'easy', 'easy'],
+      rules: { ...DEFAULT_RULES },
+    },
+    selectedCards: [],
+    hint: null,
+    selectionError: null,
+    isHumanTurn: false,
+    matchScore,
+  };
+  const noop = () => {};
+  return {
+    getSnapshot: () => snapshot,
+    subscribe: () => noop,
+    onEvent: () => noop,
+    toggleCard: noop,
+    clearSelection: noop,
+    playSelected: noop,
+    pass: noop,
+    sortHand: noop,
+    requestHint: noop,
+    newGame: noop,
+  };
+}
 
 describe('DevApp SSR smoke', () => {
   it('renders the table shell', () => {
@@ -54,5 +88,38 @@ describe('DevApp SSR smoke', () => {
 
   it('shows the opening lead prompt', () => {
     expect(html).toContain('Your lead — play any combo');
+  });
+});
+
+describe('DevApp instant win & match score', () => {
+  it('shows the THẮNG TRẮNG fanfare and defers the summary on an instant win', () => {
+    const { state } = applyInstantWin(createGame({ seed: 1 }), 2);
+    const fanfareHtml = renderToString(<DevApp controller={stubController(state)} />);
+    expect(fanfareHtml).toContain('data-testid="fanfare-instant-win"');
+    expect(fanfareHtml).toContain('THẮNG TRẮNG!');
+    expect(fanfareHtml).toContain('Bot 2');
+    // The standings wait until the fanfare has played out.
+    expect(fanfareHtml).not.toContain('data-testid="overlay-summary"');
+  });
+
+  it('shows the running match score in the round summary', () => {
+    const base = createGame({ seed: 1 });
+    const endState: GameState = {
+      ...base,
+      phase: 'gameEnd',
+      players: base.players.map((p, i) => ({
+        ...p,
+        finished: i < 3,
+        finishPlace: i < 3 ? i + 1 : null,
+        hand: i < 3 ? [] : p.hand,
+      })),
+    };
+    const summaryHtml = renderToString(
+      <DevApp controller={stubController(endState, [3, 2, 1, 0])} />,
+    );
+    expect(summaryHtml).toContain('data-testid="overlay-summary"');
+    expect(summaryHtml).toContain('data-testid="match-score"');
+    // React SSR separates adjacent text nodes with <!-- -->
+    expect(summaryHtml).toMatch(/3(<!-- -->)? pts/);
   });
 });

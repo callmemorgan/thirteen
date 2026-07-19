@@ -5,6 +5,7 @@ import { createController } from './game/controller';
 import DevApp from './ui/DevApp';
 import { SettingsScreen } from './ui/components/SettingsScreen';
 import { SplashScreen } from './ui/components/SplashScreen';
+import { loadGameConfig, saveGameConfig } from './ui/gameConfig';
 import { useThemeSettings } from './ui/useThemeSettings';
 
 /** Pin a deal for reproducible games/QA via ?seed=42 in the URL. */
@@ -26,23 +27,25 @@ type PendingConfig = Pick<GameControllerConfig, 'botDifficulties' | 'rules'>;
  * The game controller is created lazily on Play so nothing runs behind
  * the splash; leaving the table snapshots the live config so in-game
  * difficulty/rule changes carry into the next game.
+ * Difficulty and rule flags persist to localStorage (gameConfig.ts).
  */
 export default function App() {
   const [screen, setScreen] = useState<'splash' | 'table'>('splash');
   const [splashView, setSplashView] = useState<'menu' | 'settings'>('menu');
   const [rulesOpen, setRulesOpen] = useState(false);
   const [controller, setController] = useState<GameController | null>(null);
-  const [pendingConfig, setPendingConfig] = useState<PendingConfig>(() => ({
-    botDifficulties: ['medium', 'medium', 'medium'],
-    rules: { ...DEFAULT_RULES },
-  }));
+  const [pendingConfig, setPendingConfig] = useState<PendingConfig>(loadGameConfig);
   const themeSettings = useThemeSettings();
 
   const handleConfigChange = (partial: Partial<GameControllerConfig>) => {
-    setPendingConfig((prev) => ({
-      botDifficulties: partial.botDifficulties ?? prev.botDifficulties,
-      rules: partial.rules ?? prev.rules,
-    }));
+    setPendingConfig((prev) => {
+      const next = {
+        botDifficulties: partial.botDifficulties ?? prev.botDifficulties,
+        rules: partial.rules ?? prev.rules,
+      };
+      saveGameConfig(next);
+      return next;
+    });
   };
 
   const handlePlay = () => {
@@ -53,7 +56,9 @@ export default function App() {
   const handleExitToMenu = () => {
     if (controller !== null) {
       const live = controller.getSnapshot().config;
-      setPendingConfig({ botDifficulties: live.botDifficulties, rules: live.rules });
+      const next = { botDifficulties: live.botDifficulties, rules: live.rules };
+      saveGameConfig(next);
+      setPendingConfig(next);
     }
     setController(null);
     setScreen('splash');

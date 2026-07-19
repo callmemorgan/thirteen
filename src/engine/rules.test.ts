@@ -53,6 +53,7 @@ function rig(options: RigOptions): GameState {
     trick: options.trick ?? { combo: null, leaderSeat: currentSeat, passedSeats: [] },
     isFirstRound: options.isFirstRound ?? false,
     openingPlayMade: options.openingPlayMade ?? true,
+    instantWinner: null,
     rules: { ...DEFAULT_RULES },
     seed: 0,
   };

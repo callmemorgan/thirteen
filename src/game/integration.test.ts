@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { chooseMove } from '../engine/ai';
-import { applyMove, createGame, instantWinSeat } from '../engine/state';
+import { applyMove, createGame, instantWinSeat, sweepTrick } from '../engine/state';
 import type { Difficulty, GameState } from '../engine/types';
 import { createController } from './controller';
 
@@ -12,8 +12,12 @@ import { createController } from './controller';
 function simulate(seed: number, difficulties: Difficulty[]): number[] {
   let state: GameState = createGame({ seed, botDifficulties: difficulties });
   let guard = 0;
-  while (state.phase === 'playing') {
+  while (state.phase === 'playing' || state.phase === 'trickWon') {
     if (++guard > 2000) throw new Error(`game ${seed} did not terminate`);
+    if (state.phase === 'trickWon') {
+      state = sweepTrick(state).state;
+      continue;
+    }
     const seat = state.currentSeat;
     state = applyMove(state, chooseMove(state, seat, difficulties[seat])).state;
   }

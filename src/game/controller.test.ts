@@ -4,6 +4,7 @@ import { DEFAULT_RULES } from '../engine/types';
 import { compareCards, sameCard, sortCards } from '../engine/cards';
 import { classifyCombo, comboLabel } from '../engine/combos';
 import { isLegalMove } from '../engine/rules';
+import { createGame, instantWinSeat } from '../engine/state';
 import type { GameController, GameControllerConfig } from './api';
 import { createController } from './controller';
 
@@ -477,5 +478,90 @@ describe('full game', () => {
       for (const card of player.hand) keys.add(`${card.rank}:${card.suit}`);
     }
     expect(keys.size).toBe(52);
+  });
+});
+
+describe('trick sweep pause', () => {
+  it('keeps the winning combo on the table until the sweep timer fires', () => {
+    const controller = createController(makeConfig());
+
+    // Drive the hint-driven game until some trick is decided. The state must
+    // enter the trickWon interstitial with the combo still on the table —
+    // this is what lets the UI show the winning play before the next lead.
+    let steps = 0;
+    while (controller.getSnapshot().state.phase !== 'trickWon' && steps < 500) {
+      steps++;
+      stepOnce(controller);
+    }
+    const decided = controller.getSnapshot();
+    expect(decided.state.phase).toBe('trickWon');
+    expect(decided.state.trick.combo).not.toBeNull();
+    expect(decided.state.trick.leaderSeat).toBeLessThan(4);
+    // Nobody may act during the pause.
+    expect(decided.isHumanTurn).toBe(false);
+
+    // The sweep timer clears the table and hands the lead to the stored seat.
+    vi.advanceTimersByTime(1300);
+    const swept = controller.getSnapshot().state;
+    expect(swept.phase).toBe('playing');
+    expect(swept.trick.combo).toBeNull();
+    expect(swept.trick.passedSeats).toEqual([]);
+    expect(swept.trick.leaderSeat).toBe(swept.currentSeat);
+  });
+});
+
+describe('match score', () => {
+  /** Points a finished state awards per seat: 3/2/1/0 for 1st–4th. */
+  function pointsFor(controller: GameController): number[] {
+    return controller
+      .getSnapshot()
+      .state.players.map((p) => 4 - (p.finishPlace ?? 4));
+  }
+
+  it('starts at zero and awards 3/2/1/0 by finish place at gameEnd', () => {
+    const controller = createController(makeConfig());
+    expect(controller.getSnapshot().matchScore).toEqual([0, 0, 0, 0]);
+
+    driveToGameEnd(controller);
+    const snap = controller.getSnapshot();
+    expect(snap.state.phase).toBe('gameEnd');
+    expect(snap.matchScore).toEqual(pointsFor(controller));
+    expect(snap.matchScore.reduce((a, b) => a + b, 0)).toBe(6); // 3+2+1+0
+    expect(snap.matchScore[2]).toBe(3); // seat 2 wins with SEED 3 (documented above)
+  });
+
+  it('accumulates across rematches and stays visible mid-round', () => {
+    const controller = createController(makeConfig());
+    driveToGameEnd(controller);
+    const firstRound = controller.getSnapshot().matchScore;
+
+    controller.newGame();
+    // Mid-round (round 2 has just been dealt): still exactly round 1's score.
+    expect(controller.getSnapshot().matchScore).toEqual(firstRound);
+
+    driveToGameEnd(controller);
+    const secondRound = pointsFor(controller);
+    expect(controller.getSnapshot().matchScore).toEqual(
+      firstRound.map((points, seat) => points + secondRound[seat]),
+    );
+  });
+
+  it('accrues an instant-win round dealt by newGame', () => {
+    let seed = -1;
+    for (let s = 1; s < 10_000; s++) {
+      const probe = createGame({ seed: s });
+      if (instantWinSeat(probe.players.map((p) => p.hand)) !== null) {
+        seed = s;
+        break;
+      }
+    }
+    expect(seed, 'expected an instant-win seed within 10k deals').toBeGreaterThan(0);
+
+    const controller = createController(
+      makeConfig({ rules: { ...DEFAULT_RULES, instantWin: true }, seed }),
+    );
+    const snap = controller.getSnapshot();
+    expect(snap.state.phase).toBe('gameEnd');
+    expect(snap.matchScore).toEqual(pointsFor(controller));
   });
 });

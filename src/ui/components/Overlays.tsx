@@ -75,16 +75,19 @@ export function RoundSummaryOverlay({
   players,
   phase,
   rules,
+  matchScore,
   onRematch,
   onClose,
 }: {
   players: PlayerState[];
   phase: GamePhase;
   rules: RulesConfig;
+  matchScore: number[];
   onRematch: () => void;
   onClose: () => void;
 }) {
   const standings = [...players].sort((a, b) => (a.finishPlace ?? 4) - (b.finishPlace ?? 4));
+  const matchStandings = [...players].sort((a, b) => matchScore[b.id] - matchScore[a.id]);
   return (
     <Modal title={phase === 'gameEnd' ? 'Game Over' : 'Round Over'} onClose={onClose} testId="overlay-summary">
       <ol className="standings">
@@ -108,6 +111,17 @@ export function RoundSummaryOverlay({
           );
         })}
       </ol>
+      <section className="match-score" data-testid="match-score">
+        <h3>Match score</h3>
+        <ol className="standings">
+          {matchStandings.map((p) => (
+            <li key={p.id} className={`standing${p.id === 0 ? ' standing-you' : ''}`}>
+              <span className="standing-name">{p.name}</span>
+              <span className="standing-score">{matchScore[p.id]} pts</span>
+            </li>
+          ))}
+        </ol>
+      </section>
       <div className="overlay-actions">
         <button type="button" className="btn btn-primary" onClick={onRematch}>
           Rematch
@@ -117,6 +131,41 @@ export function RoundSummaryOverlay({
         </button>
       </div>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Instant-win fanfare (THẮNG TRẮNG)
+// ---------------------------------------------------------------------------
+
+export function InstantWinFanfare({
+  winnerName,
+  onDismiss,
+}: {
+  winnerName: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <motion.div
+      className="fanfare-backdrop"
+      data-testid="fanfare-instant-win"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onClick={onDismiss}
+    >
+      <motion.div
+        className="fanfare-burst"
+        initial={{ opacity: 0, scale: 0.35, rotate: -7 }}
+        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+        exit={{ opacity: 0, scale: 1.5 }}
+        transition={{ type: 'spring', stiffness: 240, damping: 17 }}
+      >
+        <div className="fanfare-title">THẮNG TRẮNG!</div>
+        <div className="fanfare-sub">{winnerName} won on the deal — instant win!</div>
+      </motion.div>
+    </motion.div>
   );
 }
 

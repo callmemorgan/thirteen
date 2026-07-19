@@ -20,6 +20,12 @@ export interface ControllerSnapshot {
   selectionError: string | null;
   /** True when it is seat 0's turn and the game is in the playing phase. */
   isHumanTurn: boolean;
+  /**
+   * Running match score per seat across rounds of this controller (rematches):
+   * 3/2/1/0 points for finishing 1st–4th, accrued when a round reaches gameEnd.
+   * A fresh controller (new match from the menu) starts at zero.
+   */
+  matchScore: number[];
 }
 
 /**

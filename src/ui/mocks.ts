@@ -21,6 +21,9 @@ import type {
 
 const BOT_DELAY_MS = 900;
 
+/** The winning combo stays on the table this long before the trick is swept. */
+const TRICK_SWEEP_MS = 1300;
+
 // ---------------------------------------------------------------------------
 // Local helpers (self-contained: engine modules are stubs at this stage)
 // ---------------------------------------------------------------------------
@@ -215,6 +218,8 @@ class MockController implements GameController {
   private listeners = new Set<() => void>();
   private eventListeners = new Set<(event: GameEvent) => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** Running match score per seat (3/2/1/0 by finish place), kept across rematches. */
+  private matchScore: number[] = [0, 0, 0, 0];
 
   constructor(config: GameControllerConfig) {
     this.config = config;
@@ -345,6 +350,7 @@ class MockController implements GameController {
       trick: { combo: null, leaderSeat: 0, passedSeats: [] },
       isFirstRound: true,
       openingPlayMade: false,
+      instantWinner: null,
       rules: this.config.rules,
       seed,
     };
@@ -355,6 +361,7 @@ class MockController implements GameController {
       hint: null,
       selectionError: null,
       isHumanTurn: true,
+      matchScore: [...this.matchScore],
     };
   }
 
@@ -398,15 +405,17 @@ class MockController implements GameController {
       events.push({ type: 'playerOut', seat, place });
     }
     next = this.advanceTurn(next, events);
+    if (next.phase === 'gameEnd') this.accrueScore(next);
     this.setSnapshot({
       state: next,
       selectedCards: [],
       selectionError: null,
       hint: null,
       isHumanTurn: next.phase === 'playing' && next.currentSeat === 0,
+      matchScore: [...this.matchScore],
     });
     events.forEach((e) => this.emit(e));
-    this.maybeScheduleBot();
+    this.scheduleNext(next);
   }
 
   private applyPass(seat: number): void {
@@ -419,15 +428,17 @@ class MockController implements GameController {
       },
       events,
     );
+    if (next.phase === 'gameEnd') this.accrueScore(next);
     this.setSnapshot({
       state: next,
       selectedCards: [],
       selectionError: null,
       hint: null,
       isHumanTurn: next.phase === 'playing' && next.currentSeat === 0,
+      matchScore: [...this.matchScore],
     });
     events.forEach((e) => this.emit(e));
-    this.maybeScheduleBot();
+    this.scheduleNext(next);
   }
 
   /** Rotate to the next active seat; resolve trick completion and round end. */
@@ -451,17 +462,14 @@ class MockController implements GameController {
       active.filter((s) => s !== trick.leaderSeat).every((s) => trick.passedSeats.includes(s))
     ) {
       // Trick complete: leader wins it and leads the next one (or the next active
-      // seat does, if the leader just went out).
+      // seat does, if the leader just went out). The combo stays on the table
+      // until the controller sweeps it (mirrors the engine's phase 'trickWon').
       let lead = trick.leaderSeat;
       if (state.players[lead].finished) {
         lead = active[(active.indexOf(lead) + 1) % active.length] ?? active[0];
       }
       events.push({ type: 'trickWon', seat: trick.leaderSeat });
-      return {
-        ...state,
-        currentSeat: lead,
-        trick: { combo: null, leaderSeat: lead, passedSeats: [] },
-      };
+      return { ...state, phase: 'trickWon', currentSeat: lead };
     }
 
     // Under pass lockout, seats that passed this trick are skipped in the rotation.
@@ -472,6 +480,12 @@ class MockController implements GameController {
       seat = order[(seat + 1) % 4];
     } while (!active.includes(seat) || lockedOut.includes(seat));
     return { ...state, currentSeat: seat };
+  }
+
+  /** Add finish-place points (3/2/1/0 for 1st–4th) at gameEnd; mirrors the real controller. */
+  private accrueScore(state: GameState): void {
+    if (state.phase !== 'gameEnd') return;
+    for (const player of state.players) this.matchScore[player.id] += 4 - (player.finishPlace ?? 4);
   }
 
   private doBotTurn(): void {
@@ -497,6 +511,24 @@ class MockController implements GameController {
       return;
     }
     this.applyPass(seat);
+  }
+
+  /** After a transition: sweep a decided trick after a beat, else schedule bots. */
+  private scheduleNext(state: GameState): void {
+    if (state.phase !== 'trickWon') {
+      this.maybeScheduleBot();
+      return;
+    }
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      const swept: GameState = {
+        ...this.snapshot.state,
+        phase: 'playing',
+        trick: { combo: null, leaderSeat: this.snapshot.state.currentSeat, passedSeats: [] },
+      };
+      this.setSnapshot({ state: swept, isHumanTurn: swept.currentSeat === 0 });
+      this.maybeScheduleBot();
+    }, TRICK_SWEEP_MS);
   }
 
   private maybeScheduleBot(): void {

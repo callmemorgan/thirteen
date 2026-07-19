@@ -1,5 +1,5 @@
 import type { Card, GameEvent, GameState, Move } from '../engine/types';
-import { applyInstantWin, applyMove, createGame, instantWinSeat } from '../engine/state';
+import { applyInstantWin, applyMove, createGame, instantWinSeat, sweepTrick } from '../engine/state';
 import type { GameConfig } from '../engine/state';
 import { isLegalMove } from '../engine/rules';
 import { beats, classifyCombo, comboLabel } from '../engine/combos';
@@ -15,13 +15,17 @@ const THREE_OF_SPADES: Card = { rank: 3, suit: 'spades' };
 const MIN_BOT_DELAY_MS = 600;
 const BOT_DELAY_SPREAD_MS = 600;
 
+/** The winning combo stays on the table this long before the trick is swept. */
+const TRICK_SWEEP_MS = 1300;
+
 function isHumanTurn(state: GameState): boolean {
   return state.phase === 'playing' && state.currentSeat === 0;
 }
 
 /**
- * The real engine-backed controller: wires createGame/applyMove/isLegalMove and
- * bot scheduling (600–1200 ms thinking delays) behind the GameController API.
+ * The real engine-backed controller: wires createGame/applyMove/isLegalMove,
+ * bot scheduling (600–1200 ms thinking delays), and the trick-sweep pause
+ * (TRICK_SWEEP_MS via sweepTrick) behind the GameController API.
  *
  * Snapshot updates go to `subscribe` listeners (React via useSyncExternalStore);
  * transient engine events go to `onEvent` listeners after each transition.
@@ -35,6 +39,8 @@ class EngineController implements GameController {
   private timer: ReturnType<typeof setTimeout> | null = null;
   /** Deterministic source for bot delays so seeded games stay reproducible. */
   private delayRng: () => number;
+  /** Running match score per seat (3/2/1/0 by finish place), kept across rematches. */
+  private matchScore: number[] = [0, 0, 0, 0];
 
   constructor(config: GameControllerConfig) {
     const seed = config.seed ?? Date.now();
@@ -43,6 +49,7 @@ class EngineController implements GameController {
     // Events from an instant win are dropped silently here (no listeners yet),
     // matching the silent initial deal.
     const { state } = this.deal(seed);
+    this.accrueScore(state);
     this.snapshot = {
       state,
       config: this.config,
@@ -50,6 +57,7 @@ class EngineController implements GameController {
       hint: null,
       selectionError: null,
       isHumanTurn: isHumanTurn(state),
+      matchScore: [...this.matchScore],
     };
     this.maybeScheduleBot();
   }
@@ -163,6 +171,9 @@ class EngineController implements GameController {
         ? { startingSeat: winnerSeat, isFirstRound: false, round: previous.round + 1 }
         : { isFirstRound: true },
     );
+    // The new deal can itself end on the spot (instant win) — a fresh round, so
+    // always accrue; the previous round was accrued when it reached gameEnd.
+    this.accrueScore(state);
     this.snapshot = {
       state,
       config: this.config,
@@ -170,6 +181,7 @@ class EngineController implements GameController {
       hint: null,
       selectionError: null,
       isHumanTurn: isHumanTurn(state),
+      matchScore: [...this.matchScore],
     };
     this.notify();
     this.emit({ type: 'dealt' });
@@ -191,6 +203,14 @@ class EngineController implements GameController {
   // -------------------------------------------------------------------------
   // internals
   // -------------------------------------------------------------------------
+
+  /** Add finish-place points (3/2/1/0 for 1st–4th) to the match score at gameEnd. */
+  private accrueScore(state: GameState): void {
+    if (state.phase !== 'gameEnd') return;
+    for (const player of state.players) {
+      this.matchScore[player.id] += 4 - (player.finishPlace ?? 4);
+    }
+  }
 
   private gameConfig(seed: number, extra?: Partial<GameConfig>): GameConfig {
     return {
@@ -229,6 +249,9 @@ class EngineController implements GameController {
 
   /** Apply an engine transition: publish state, stream events, schedule bots. */
   private commit(result: { state: GameState; events: GameEvent[] }): void {
+    const roundJustEnded =
+      result.state.phase === 'gameEnd' && this.snapshot.state.phase !== 'gameEnd';
+    if (roundJustEnded) this.accrueScore(result.state);
     this.snapshot = {
       ...this.snapshot,
       state: result.state,
@@ -236,9 +259,18 @@ class EngineController implements GameController {
       hint: null,
       selectionError: null,
       isHumanTurn: isHumanTurn(result.state),
+      matchScore: [...this.matchScore],
     };
     this.notify();
     for (const event of result.events) this.emit(event);
+    if (result.state.phase === 'trickWon') {
+      // Show the winning combo for a beat, then sweep it and hand over the lead.
+      this.timer = setTimeout(() => {
+        this.timer = null;
+        this.commit(sweepTrick(this.snapshot.state));
+      }, TRICK_SWEEP_MS);
+      return;
+    }
     this.maybeScheduleBot();
   }
 
@@ -285,8 +317,9 @@ class EngineController implements GameController {
 }
 
 /**
- * Create the real engine-backed controller: wires createGame/applyMove/isLegalMove
- * and bot scheduling (600–1200 ms thinking delays) behind the GameController API.
+ * Create the real engine-backed controller: wires createGame/applyMove/isLegalMove,
+ * bot scheduling (600–1200 ms thinking delays), and the trick-sweep pause behind
+ * the GameController API.
  */
 export function createController(config: GameControllerConfig): GameController {
   return new EngineController(config);

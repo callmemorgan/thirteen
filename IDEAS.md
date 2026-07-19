@@ -6,7 +6,9 @@ Effort tags are rough: **S** small, **M** medium, **L** large.
 ## Gameplay & rules depth
 
 - **Out-of-turn chops (chặt interrupts)** — jump in with a bomb even when it's not
-  your turn. The engine already has the chop matrix; this adds interrupt timing and
+  your turn. A common traditional house rule (especially in gambling play, where it
+  pairs with chặt chồng), but not universal — ship it as a Settings toggle, off by
+  default. The engine already has the chop matrix; this adds interrupt timing and
   turn-resumption logic. **M** — high chaos/fun.
 - **Chop bounties (chặt chồng)** — debt stacking when chops get re-chopped.
   Part of the gambling rule set. **M**
@@ -16,20 +18,33 @@ Effort tags are rough: **S** small, **M** medium, **L** large.
 - **More instant-win hands** — 6 pairs, 5 consecutive pairs, 3 triples, etc.
   (v1: four 2s + 12-card dragon only.) **S**
 - **2- and 3-player games** — the engine is hardcoded to 4 seats. **M**
-- **Multi-round matches** — no running match score across rounds; rematches
-  increment the round counter and the previous winner leads. **S–M**
+- **Turn timer / speed mode** — optional countdown per turn; auto-pass on expiry.
+  **M**
+- **Seeded deals / daily challenge** — share a deal seed with a friend (the engine
+  is already deterministic via `?seed=`); a daily seed + comparing results makes it
+  a game. **S–M**
 
 ## Feel & UX polish
 
 - **True FLIP animation** — cards currently glide from the seat edge, not from the
   exact tapped card. **S–M** — pure juice.
-- **Instant-win fanfare** — the game just ends with the normal summary; no
-  "THẮNG TRẮNG!" moment. **S**
-- **Win/loss stats** — no record of your history against the bots. **S–M**
+- **Chop impact effects** — screen shake / table flash when a bomb lands, distinct
+  from the normal play animation. **S**
+- **Win/loss stats** — no record of your history against the bots. (Match score
+  within a session exists; this is across sessions.) **S–M**
 - **Per-seat bot personalities** — Settings applies one difficulty to all bots; the
   engine supports a mixed table, the UI doesn't expose it. **S**
-- **Settings persistence** — theme/mute survive reloads; difficulty and rule flags
-  don't. **S**
+- **Bot names and avatars** — give the three bots identities instead of Bot 1–3. **S**
+- **Trick history / move log** — collapsible panel listing what was played this
+  round; genuinely useful mid-game. **S–M**
+- **Played-cards tracker** — see which 2s and bombs are already gone; an "assist"
+  toggle in Settings so purists can turn it off. **S**
+- **Drag-to-select cards** — swipe across the fan to select a run instead of
+  tapping each card. **M**
+- **Animation speed setting** — snappy vs. savoring bot play. **S**
+- **Achievements** — win without passing, win holding a 2, chop someone, etc. **M**
+- **Vietnamese UI toggle** — fitting for Tiến Lên; requires extracting all strings
+  first. **M**
 - **Onboarding/tutorial** — only the static rules modal; no guided first game. **M**
 - **Keyboard & screen-reader depth** — buttons are focusable, but a full
   keyboard-only game is awkward and game events aren't announced. **M**

@@ -45,9 +45,16 @@ describe('applyInstantWin', () => {
     const { state: next, events } = applyInstantWin(state, 2);
     expect(next.phase).toBe('gameEnd');
     expect(next.players.map((p) => p.finishPlace)).toEqual([3, 4, 1, 2]);
-    expect(events.map((e) => e.type)).toEqual(['playerOut', 'roundEnd', 'gameEnd']);
-    const gameEnd = events[2];
+    expect(events.map((e) => e.type)).toEqual(['instantWin', 'playerOut', 'roundEnd', 'gameEnd']);
+    const gameEnd = events[3];
     expect(gameEnd.type === 'gameEnd' && gameEnd.placements).toEqual([2, 3, 0, 1]);
+  });
+
+  it('records the instant winner in state (createGame starts with none)', () => {
+    const state = createGame({ seed: 1 });
+    expect(state.instantWinner).toBeNull();
+    const { state: next } = applyInstantWin(state, 2);
+    expect(next.instantWinner).toBe(2);
   });
 });
 

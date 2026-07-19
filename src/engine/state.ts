@@ -107,6 +107,7 @@ export function createGame(config: GameConfig = {}): GameState {
     trick: { combo: null, leaderSeat: leader, passedSeats: [] },
     isFirstRound,
     openingPlayMade: false,
+    instantWinner: null,
     rules: { ...DEFAULT_RULES, ...config.rules },
     seed,
   };
@@ -116,7 +117,8 @@ export function createGame(config: GameConfig = {}): GameState {
  * Apply a legal move and return the next state plus transient events for UI/SFX.
  * Throws on an illegal move. Handles: turn rotation (skipping finished players and,
  * under pass lockout, seats that passed this trick), pass/re-entry, trick completion
- * (trickWon), player finishes (playerOut), and round end when three players are out
+ * (phase 'trickWon' with the winning combo left on the table — sweepTrick clears
+ * it), player finishes (playerOut), and round end when three players are out
  * (roundEnd + gameEnd).
  */
 export function applyMove(
@@ -171,11 +173,13 @@ function applyPass(state: GameState, seat: number): { state: GameState; events: 
   const nextLeader = state.players[leaderSeat].finished
     ? nextActiveSeat(state.players, leaderSeat)
     : leaderSeat;
+  // Keep the winning combo on the table; sweepTrick clears it after a beat.
   return {
     state: {
       ...state,
+      phase: 'trickWon',
       currentSeat: nextLeader,
-      trick: { combo: null, leaderSeat: nextLeader, passedSeats: [] },
+      trick: { ...state.trick, passedSeats },
     },
     events,
   };
@@ -261,11 +265,12 @@ function applyPlay(
     events.push({ type: 'trickWon', seat });
     // If the winner went out, the lead passes to the next active seat after them.
     const nextLeader = players[seat].finished ? nextActiveSeat(players, seat) : seat;
+    // Keep the winning combo on the table; sweepTrick clears it after a beat.
     return {
       state: {
         ...nextState,
+        phase: 'trickWon',
         currentSeat: nextLeader,
-        trick: { combo: null, leaderSeat: nextLeader, passedSeats: [] },
       },
       events,
     };
@@ -282,6 +287,24 @@ function applyPlay(
       ),
     },
     events,
+  };
+}
+
+/**
+ * Clear a decided trick: the table empties and `currentSeat` (already the next
+ * leader) leads fresh. Lets the UI show the winning combo for a beat before the
+ * next trick — the controller calls this on a timer after phase 'trickWon'.
+ * No-op outside the 'trickWon' phase.
+ */
+export function sweepTrick(state: GameState): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== 'trickWon') return { state, events: [] };
+  return {
+    state: {
+      ...state,
+      phase: 'playing',
+      trick: { combo: null, leaderSeat: state.currentSeat, passedSeats: [] },
+    },
+    events: [],
   };
 }
 
@@ -332,8 +355,9 @@ export function applyInstantWin(
     finishPlace: placements.indexOf(player.id) + 1,
   }));
   return {
-    state: { ...state, players, phase: 'gameEnd', currentSeat: winnerSeat },
+    state: { ...state, players, phase: 'gameEnd', currentSeat: winnerSeat, instantWinner: winnerSeat },
     events: [
+      { type: 'instantWin', seat: winnerSeat },
       { type: 'playerOut', seat: winnerSeat, place: 1 },
       { type: 'roundEnd', placements },
       { type: 'gameEnd', placements },

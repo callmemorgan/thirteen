@@ -30,8 +30,13 @@ Pin a reproducible deal with a seed: `http://localhost:5173/?seed=42`.
 - Three bot difficulties (Settings): easy, medium, hard — the hard bot evaluates
   exact minimum-turns hand decompositions and manages control cards (2s/bombs).
 - Smooth `motion` animations: deal-in, hand→table glide, trick sweep, chop flash.
+- Instant-win fanfare: with the instant-win rule on, a winning deal triggers a
+  full-screen THẮNG TRẮNG celebration before the summary.
+- Running match score across rematches (3/2/1/0 points by finish place), shown
+  in the round summary.
 - Synthesized WebAudio SFX (no audio assets), with a persisted mute toggle.
-- Cosmetics: 3 felt themes × 3 card-back designs, persisted to localStorage.
+- Cosmetics: 3 felt themes × 3 card-back designs, persisted to localStorage —
+  as are bot difficulty and the optional rule flags.
 - Mobile-first responsive layout, touch-friendly fanned hand, safe-area aware.
 
 ## Scripts
@@ -53,8 +58,9 @@ Strictly layered, framework-agnostic engine ↔ controller ↔ React UI:
 src/
   engine/    Pure TS game logic, deterministic (seeded RNG), fully unit-tested:
              types (contracts), cards, rng, combos, rules, state, ai/{enumerate,evaluate,policies}
-  game/      api (GameController contract), controller (engine wiring + bot scheduling),
-             store (React binding), integration tests (incl. hard-vs-easy win-rate)
+  game/      api (GameController contract), controller (engine wiring, bot scheduling,
+             trick-sweep timing), store (React binding), integration tests
+             (incl. hard-vs-easy win-rate)
   ui/        DevApp (composition root), components/, themes, audio, styles,
              mocks (mock controller for UI development)
   App.tsx    Production entry: injects the real controller into DevApp
@@ -62,6 +68,19 @@ src/
 
 The UI codes against the `GameController` interface only, so it runs on either the
 real engine controller or the built-in mock (`src/ui/mocks.ts`).
+
+Turn flow: moves apply synchronously through `applyMove`. When a trick is decided,
+the engine enters a brief `trickWon` phase with the winning combo left on the
+table (no moves are legal); the controller sweeps it via `sweepTrick` after ~1.3 s
+so the winning play stays visible before the next lead.
+
+Instant win: with the rule on, a winning deal ends the game immediately —
+the engine records `instantWinner` in state and emits an `instantWin` event, and
+the UI plays the THẮNG TRẮNG fanfare before the summary appears.
+
+Match score: the controller (not the per-round engine state) keeps a running
+total across rematches — 3/2/1/0 points by finish place, accrued each time a
+round reaches `gameEnd` and exposed as `snapshot.matchScore`.
 
 Visual QA screenshots land in `qa/` (git-ignored).
 

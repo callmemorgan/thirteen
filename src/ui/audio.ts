@@ -16,7 +16,8 @@ export type SfxName =
   | 'pass' // pass tick
   | 'sweep' // trick won, cards swept away (whoosh)
   | 'out' // a player shed their last card
-  | 'win'; // round/game over stinger
+  | 'win' // round/game over stinger
+  | 'fanfare'; // instant win (THẮNG TRẮNG) stinger
 
 const MUTE_KEY = 'thirteen.muted';
 
@@ -121,6 +122,13 @@ class SfxManager {
         [523, 659, 784, 1047].forEach((freq, i) =>
           this.tone({ freq, dur: 0.24, type: 'triangle', gain: 0.3, at: i * 0.11 }),
         );
+        break;
+      case 'fanfare':
+        // Bigger rising arpeggio than 'win', with a shimmer on top.
+        [392, 523, 659, 784, 1047, 1319].forEach((freq, i) =>
+          this.tone({ freq, dur: 0.3, type: 'triangle', gain: 0.3, at: i * 0.09 }),
+        );
+        this.noise({ dur: 0.45, at: 0.54, gain: 0.22, filter: 'highpass', freq: 5200 });
         break;
     }
   }

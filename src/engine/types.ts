@@ -68,7 +68,12 @@ export const DEFAULT_RULES: RulesConfig = {
   passLockout: true,
 };
 
-export type GamePhase = 'dealing' | 'playing' | 'roundEnd' | 'gameEnd';
+/**
+ * 'trickWon' is a brief interstitial: the winning combo stays on the table and
+ * `currentSeat` already points at the next leader, but no moves are legal until
+ * the controller sweeps the trick (see sweepTrick in state.ts).
+ */
+export type GamePhase = 'dealing' | 'playing' | 'trickWon' | 'roundEnd' | 'gameEnd';
 
 export interface PlayerState {
   /** Seat index 0..3. Seat 0 is the local human by convention. */
@@ -107,6 +112,12 @@ export interface GameState {
   isFirstRound: boolean;
   /** True once the first play of a first round has been made. */
   openingPlayMade: boolean;
+  /**
+   * Seat that won instantly on the deal (rules.instantWin), else null. Set by
+   * applyInstantWin and survives in state so the UI can fanfare even when the
+   * win happened before any event listeners attached (e.g. the first deal).
+   */
+  instantWinner: number | null;
   rules: RulesConfig;
   seed: number;
 }
@@ -121,8 +132,12 @@ export type GameEvent =
   /** `chop` is true when the combo chopped a 2-combo or a lower bomb. */
   | { type: 'played'; seat: number; combo: Combo; chop: boolean }
   | { type: 'passed'; seat: number }
+  /** The trick is decided; the table actually clears on the sweep that follows
+   *  (phase 'trickWon' → sweepTrick), so UI can show the winning combo first. */
   | { type: 'trickWon'; seat: number }
   | { type: 'playerOut'; seat: number; place: number }
+  /** A seat won instantly on the deal (rules.instantWin); precedes playerOut/roundEnd/gameEnd. */
+  | { type: 'instantWin'; seat: number }
   /** Seats in finish order (index 0 = 1st place). */
   | { type: 'roundEnd'; placements: number[] }
   | { type: 'gameEnd'; placements: number[] };

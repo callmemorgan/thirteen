@@ -24,7 +24,12 @@ import { ActionBar } from './components/ActionBar';
 import { OpponentSeat } from './components/OpponentSeat';
 import { PlayerHand } from './components/PlayerHand';
 import { PlayArea } from './components/PlayArea';
-import { RoundSummaryOverlay, RulesOverlay, SettingsOverlay } from './components/Overlays';
+import {
+  InstantWinFanfare,
+  RoundSummaryOverlay,
+  RulesOverlay,
+  SettingsOverlay,
+} from './components/Overlays';
 import './styles.css';
 
 type OverlayId = 'settings' | 'rules' | null;
@@ -58,6 +63,9 @@ const SEAT_POSITION: Record<number, string> = {
   3: 'seat-right',
 };
 
+/** How long the instant-win fanfare stays up before the summary takes over. */
+const FANFARE_MS = 2800;
+
 export default function DevApp({
   controller: injected,
   onExitToMenu,
@@ -73,6 +81,8 @@ export default function DevApp({
   const [chopId, setChopId] = useState(0);
   const [overlay, setOverlay] = useState<OverlayId>(null);
   const [summaryDismissed, setSummaryDismissed] = useState(false);
+  // True once the instant-win fanfare has played (auto after FANFARE_MS or on tap).
+  const [fanfareDone, setFanfareDone] = useState(false);
   const chopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Autoplay policy: create/resume the AudioContext on the first gesture.
@@ -99,6 +109,7 @@ export default function DevApp({
       case 'dealt':
         setDealId((id) => id + 1);
         setSummaryDismissed(false);
+        setFanfareDone(false);
         sfx.play('deal');
         break;
       case 'played':
@@ -118,9 +129,13 @@ export default function DevApp({
       case 'playerOut':
         sfx.play('out');
         break;
+      case 'instantWin':
+        sfx.play('fanfare');
+        break;
       case 'roundEnd':
       case 'gameEnd':
-        sfx.play('win');
+        // An instant win gets its own fanfare stinger instead.
+        if (controller.getSnapshot().state.instantWinner === null) sfx.play('win');
         break;
     }
   });
@@ -130,6 +145,15 @@ export default function DevApp({
   const { trick, players, phase, currentSeat } = state;
   const human = players[0];
   const roundOver = phase === 'roundEnd' || phase === 'gameEnd';
+  // Fanfare first, summary after: the winner's moment before the standings.
+  const fanfarePending = state.instantWinner !== null && !fanfareDone;
+
+  // Auto-dismiss the fanfare after a beat (a tap dismisses it sooner).
+  useEffect(() => {
+    if (!fanfarePending) return;
+    const timer = setTimeout(() => setFanfareDone(true), FANFARE_MS);
+    return () => clearTimeout(timer);
+  }, [fanfarePending]);
 
   const handleToggle = (card: Card) => {
     sfx.play('select');
@@ -264,12 +288,20 @@ export default function DevApp({
       </div>
 
       <AnimatePresence>
-        {roundOver && !summaryDismissed && (
+        {fanfarePending && (
+          <InstantWinFanfare
+            key="fanfare"
+            winnerName={players[state.instantWinner ?? 0].name}
+            onDismiss={() => setFanfareDone(true)}
+          />
+        )}
+        {roundOver && !summaryDismissed && !fanfarePending && (
           <RoundSummaryOverlay
             key="summary"
             players={players}
             phase={phase}
             rules={state.rules}
+            matchScore={snapshot.matchScore}
             onRematch={handleRematch}
             onClose={() => setSummaryDismissed(true)}
           />
