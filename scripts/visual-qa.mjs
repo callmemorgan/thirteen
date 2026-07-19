@@ -8,12 +8,16 @@
  *
  * Usage: node scripts/visual-qa.mjs
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const BASE = process.env.QA_URL ?? 'http://localhost:5173';
 const OUT = new URL('../qa/', import.meta.url).pathname;
 mkdirSync(OUT, { recursive: true });
+// Drop stale screenshots from previous runs so qa/ reflects this run only.
+for (const f of readdirSync(OUT)) {
+  if (f.endsWith('.png')) unlinkSync(`${OUT}${f}`);
+}
 
 const errors = [];
 
@@ -81,30 +85,40 @@ try {
 {
   const { ctx, page } = await newPage(browser, { viewport: { width: 1280, height: 800 } });
   await page.goto(BASE, { waitUntil: 'load' });
+  await page.waitForTimeout(900); // splash entrance animation
+  await shot(page, '00-desktop-splash');
+
+  await page.getByTestId('splash-settings-button').click();
+  await page.waitForTimeout(300);
+  await shot(page, '01-desktop-settings-page');
+  await page.getByTestId('settings-back').click();
+  await page.waitForTimeout(200);
+
+  await page.getByTestId('play-button').click();
   await page.waitForTimeout(1600); // deal-in animation
-  await shot(page, '01-desktop-deal');
+  await shot(page, '02-desktop-deal');
 
   await waitForHumanTurn(page);
   await page.getByRole('button', { name: 'Hint' }).click();
   await page.waitForTimeout(400);
-  await shot(page, '02-desktop-hinted');
+  await shot(page, '03-desktop-hinted');
 
   const outcome = await takeHintedTurn(page);
   await page.waitForTimeout(900);
-  await shot(page, `03-desktop-${outcome}`);
+  await shot(page, `04-desktop-${outcome}`);
 
   await page.waitForTimeout(6000); // let bots take turns
-  await shot(page, '04-desktop-midgame');
+  await shot(page, '05-desktop-midgame');
 
   await page.getByTestId('settings-button').click();
   await page.waitForTimeout(300);
-  await shot(page, '05-desktop-settings');
+  await shot(page, '06-desktop-settings');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
 
   await page.getByTestId('rules-button').click();
   await page.waitForTimeout(300);
-  await shot(page, '06-desktop-rules');
+  await shot(page, '07-desktop-rules');
   await ctx.close();
 }
 
@@ -116,13 +130,17 @@ try {
     hasTouch: true,
   });
   await page.goto(BASE, { waitUntil: 'load' });
-  await page.waitForTimeout(1600);
-  await shot(page, '07-mobile-deal');
+  await page.waitForTimeout(900); // splash entrance animation
+  await shot(page, '08-mobile-splash');
+
+  await page.getByTestId('play-button').tap();
+  await page.waitForTimeout(1600); // deal-in animation
+  await shot(page, '09-mobile-deal');
 
   await waitForHumanTurn(page);
   await page.getByRole('button', { name: 'Hint' }).tap();
   await page.waitForTimeout(400);
-  await shot(page, '08-mobile-hinted');
+  await shot(page, '10-mobile-hinted');
   await ctx.close();
 }
 

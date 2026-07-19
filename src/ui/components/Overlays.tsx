@@ -124,29 +124,34 @@ export function RoundSummaryOverlay({
 // Settings
 // ---------------------------------------------------------------------------
 
-export function SettingsOverlay({
-  themeId,
-  cardBackId,
-  muted,
-  config,
-  onThemeChange,
-  onCardBackChange,
-  onMutedChange,
-  onConfigChange,
-  onClose,
-}: {
+export interface SettingsPanelProps {
   themeId: string;
   cardBackId: string;
   muted: boolean;
   config: GameControllerConfig;
+  /** Footnote under the game-config sections (how/when changes apply). */
+  configNote?: string;
   onThemeChange: (id: string) => void;
   onCardBackChange: (id: string) => void;
   onMutedChange: (muted: boolean) => void;
   onConfigChange: (partial: Partial<GameControllerConfig>) => void;
-  onClose: () => void;
-}) {
+}
+
+/** All settings sections, without modal chrome. Shared by the in-game
+ *  SettingsOverlay modal and the splash-flow full-screen settings page. */
+export function SettingsPanel({
+  themeId,
+  cardBackId,
+  muted,
+  config,
+  configNote,
+  onThemeChange,
+  onCardBackChange,
+  onMutedChange,
+  onConfigChange,
+}: SettingsPanelProps) {
   return (
-    <Modal title="Settings" onClose={onClose} testId="overlay-settings">
+    <>
       <section className="settings-section">
         <h3>Bot difficulty</h3>
         <div className="segmented">
@@ -195,7 +200,7 @@ export function SettingsOverlay({
           <span className="toggle-label">{config.rules.thoi2Scoring ? 'On' : 'Off'}</span>
         </button>
       </section>
-      <p className="settings-note">Difficulty and rule changes start a new game.</p>
+      {configNote !== undefined && <p className="settings-note">{configNote}</p>}
       <section className="settings-section">
         <h3>Table felt</h3>
         <div className="theme-grid">
@@ -255,6 +260,20 @@ export function SettingsOverlay({
           <span className="toggle-label">{muted ? 'Off' : 'On'}</span>
         </button>
       </section>
+    </>
+  );
+}
+
+export function SettingsOverlay({
+  onClose,
+  ...panelProps
+}: Omit<SettingsPanelProps, 'configNote'> & { onClose: () => void }) {
+  return (
+    <Modal title="Settings" onClose={onClose} testId="overlay-settings">
+      <SettingsPanel
+        {...panelProps}
+        configNote="Difficulty and rule changes start a new game."
+      />
     </Modal>
   );
 }

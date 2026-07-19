@@ -18,15 +18,8 @@ import { sfx } from './audio';
 import { placeLabel } from './cards';
 import { useControllerSnapshot, useGameEvents } from './hooks';
 import { createMockController } from './mocks';
-import {
-  cardBackById,
-  feltThemeById,
-  loadCardBackId,
-  loadThemeId,
-  saveCardBackId,
-  saveThemeId,
-  themeCssVars,
-} from './themes';
+import { cardBackById, feltThemeById, themeCssVars } from './themes';
+import { useThemeSettings } from './useThemeSettings';
 import { ActionBar } from './components/ActionBar';
 import { OpponentSeat } from './components/OpponentSeat';
 import { PlayerHand } from './components/PlayerHand';
@@ -46,6 +39,8 @@ const GEAR_PATH =
   'c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6' +
   's1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z';
 
+const HOME_PATH = 'M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z';
+
 const SOUND_ON_PATH =
   'M3,9v6h4l5,5V4L7,9H3z M16.5,12c0-1.77-1.02-3.29-2.5-4.03v8.05C15.48,15.29,16.5,13.77,16.5,12z ' +
   'M14,3.23v2.06c2.89,0.86,5,3.54,5,6.71s-2.11,5.85-5,6.71v2.06c4.01-0.91,7-4.49,7-8.77S18.01,4.14,14,3.23z';
@@ -63,16 +58,17 @@ const SEAT_POSITION: Record<number, string> = {
   3: 'seat-right',
 };
 
-export default function DevApp({ controller: injected }: { controller?: GameController } = {}) {
+export default function DevApp({
+  controller: injected,
+  onExitToMenu,
+}: { controller?: GameController; onExitToMenu?: () => void } = {}) {
   // The production app (src/App.tsx) injects the real engine controller;
   // standalone UI development falls back to the mock.
   const [controller] = useState(() => injected ?? createMockController());
   const snapshot = useControllerSnapshot(controller);
   const { state, selectedCards, hint, selectionError, isHumanTurn } = snapshot;
 
-  const [themeId, setThemeId] = useState(loadThemeId);
-  const [cardBackId, setCardBackId] = useState(() => loadCardBackId(loadThemeId()));
-  const [muted, setMuted] = useState(() => sfx.isMuted());
+  const { themeId, cardBackId, muted, setTheme, setCardBack, setMuted } = useThemeSettings();
   const [dealId, setDealId] = useState(0);
   const [chopId, setChopId] = useState(0);
   const [overlay, setOverlay] = useState<OverlayId>(null);
@@ -140,21 +136,6 @@ export default function DevApp({ controller: injected }: { controller?: GameCont
     controller.toggleCard(card);
   };
 
-  const handleThemeChange = (id: string) => {
-    setThemeId(id);
-    saveThemeId(id);
-  };
-
-  const handleCardBackChange = (id: string) => {
-    setCardBackId(id);
-    saveCardBackId(id);
-  };
-
-  const handleMutedChange = (next: boolean) => {
-    sfx.setMuted(next);
-    setMuted(next);
-  };
-
   const handleRematch = () => {
     setSummaryDismissed(false);
     controller.newGame();
@@ -174,12 +155,25 @@ export default function DevApp({ controller: injected }: { controller?: GameCont
           <span className="round-chip">Round {state.round}</span>
         </div>
         <div className="topbar-actions">
+          {onExitToMenu !== undefined && (
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Main menu"
+              onClick={onExitToMenu}
+              data-testid="menu-button"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d={HOME_PATH} />
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             className="icon-btn"
             aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
             aria-pressed={muted}
-            onClick={() => handleMutedChange(!muted)}
+            onClick={() => setMuted(!muted)}
             data-testid="mute-toggle"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -287,9 +281,9 @@ export default function DevApp({ controller: injected }: { controller?: GameCont
             cardBackId={cardBackId}
             muted={muted}
             config={snapshot.config}
-            onThemeChange={handleThemeChange}
-            onCardBackChange={handleCardBackChange}
-            onMutedChange={handleMutedChange}
+            onThemeChange={setTheme}
+            onCardBackChange={setCardBack}
+            onMutedChange={setMuted}
             onConfigChange={handleConfigChange}
             onClose={() => setOverlay(null)}
           />

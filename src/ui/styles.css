@@ -904,6 +904,129 @@ button {
 }
 
 /* --------------------------------------------------------------------------
+ * Splash + settings pages (themed like .table-root via inline CSS vars)
+ * ------------------------------------------------------------------------ */
+
+.splash-root,
+.settings-page {
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  color: #fff;
+  background: radial-gradient(120% 95% at 50% 28%, var(--felt-center) 0%, var(--felt-edge) 76%);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* vignette, fixed so it holds while the settings page scrolls */
+.splash-root::before,
+.settings-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  box-shadow: inset 0 0 110px 26px color-mix(in srgb, var(--rail) 62%, transparent);
+  pointer-events: none;
+}
+
+.splash-root {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.splash-fan {
+  --cw: 92px;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 22px;
+}
+
+.splash-fan-card {
+  flex: none;
+}
+
+.splash-fan-card + .splash-fan-card {
+  margin-left: calc(var(--cw) * -0.52);
+}
+
+.splash-title {
+  position: relative;
+  z-index: 2;
+  margin: 0;
+  font-size: clamp(42px, 9vw, 74px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+}
+
+.splash-subtitle {
+  position: relative;
+  z-index: 2;
+  margin: 6px 0 30px;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.splash-buttons {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(300px, 82vw);
+}
+
+.splash-buttons .btn {
+  width: 100%;
+  font-size: 16px;
+}
+
+.splash-play {
+  min-height: 54px;
+  font-size: 18px;
+}
+
+.settings-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(16px + env(safe-area-inset-top)) 16px
+    calc(16px + env(safe-area-inset-bottom));
+}
+
+.settings-page-panel {
+  position: relative;
+  z-index: 2;
+}
+
+.settings-page-head {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .splash-fan {
+    --cw: 64px;
+  }
+
+  .splash-subtitle {
+    font-size: 13.5px;
+  }
+}
+
+/* --------------------------------------------------------------------------
  * Responsive
  * ------------------------------------------------------------------------ */
 
