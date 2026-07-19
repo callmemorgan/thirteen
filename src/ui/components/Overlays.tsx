@@ -335,6 +335,7 @@ export function RulesOverlay({ rules, onClose }: { rules: RulesConfig; onClose: 
           <h3>Flow</h3>
           <ul>
             <li>The 3♠ holder opens; the first play must include it</li>
+            <li>On rematches the previous winner leads with any combo</li>
             {rules.passLockout ? (
               <li>Pass and you sit out the trick — you rejoin when someone sweeps and leads</li>
             ) : (

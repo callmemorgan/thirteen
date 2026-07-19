@@ -160,7 +160,7 @@ class EngineController implements GameController {
       seed,
       // Rematch: the previous winner leads and the 3♠ opening rule is off.
       completed && winnerSeat !== undefined
-        ? { startingSeat: winnerSeat, isFirstRound: false }
+        ? { startingSeat: winnerSeat, isFirstRound: false, round: previous.round + 1 }
         : { isFirstRound: true },
     );
     this.snapshot = {

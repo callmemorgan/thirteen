@@ -413,6 +413,23 @@ describe('rematch', () => {
     for (const player of snap.state.players) expect(player.hand).toHaveLength(13);
     expect(events).toContainEqual({ type: 'dealt' });
   });
+
+  it('rematch after gameEnd increments the round and lets the winner lead', () => {
+    const controller = createController(makeConfig());
+    driveToGameEnd(controller);
+    const winnerSeat = controller
+      .getSnapshot()
+      .state.players.find((player) => player.finishPlace === 1)?.id;
+    expect(winnerSeat).toBe(2); // documented outcome for SEED 3
+
+    controller.newGame();
+    const snap = controller.getSnapshot();
+    expect(snap.state.phase).toBe('playing');
+    expect(snap.state.round).toBe(2);
+    expect(snap.state.isFirstRound).toBe(false);
+    expect(snap.state.currentSeat).toBe(2);
+    for (const player of snap.state.players) expect(player.hand).toHaveLength(13);
+  });
 });
 
 describe('full game', () => {

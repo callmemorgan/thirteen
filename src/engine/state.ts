@@ -28,6 +28,8 @@ export interface GameConfig {
   startingSeat?: number;
   /** Default true. When true, the 3♠ holder leads and must include it in the first play. */
   isFirstRound?: boolean;
+  /** 1-based round number; the controller increments it on rematches. Default 1. */
+  round?: number;
 }
 
 const SEAT_COUNT = 4;
@@ -95,7 +97,7 @@ export function createGame(config: GameConfig = {}): GameState {
 
   return {
     phase: 'playing',
-    round: 1,
+    round: config.round ?? 1,
     players,
     currentSeat: leader,
     trick: { combo: null, leaderSeat: leader, passedSeats: [] },

@@ -16,8 +16,8 @@ Effort tags are rough: **S** small, **M** medium, **L** large.
 - **More instant-win hands** — 6 pairs, 5 consecutive pairs, 3 triples, etc.
   (v1: four 2s + 12-card dragon only.) **S**
 - **2- and 3-player games** — the engine is hardcoded to 4 seats. **M**
-- **Multi-round matches** — rematches are fresh "Round 1"s; no running match score
-  across rounds (engine already supports winner-leads). **S–M**
+- **Multi-round matches** — no running match score across rounds; rematches
+  increment the round counter and the previous winner leads. **S–M**
 
 ## Feel & UX polish
 
