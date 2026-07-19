@@ -398,6 +398,8 @@ button {
 
 .pcard-button {
   cursor: pointer;
+  /* Re-enable hits inside the click-transparent hand wrappers. */
+  pointer-events: auto;
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease;
@@ -481,6 +483,14 @@ button {
 .hand-card-fan {
   transform: rotate(calc((var(--i, 0) - var(--mid, 0)) * 2.1deg));
   transform-origin: 50% 135%;
+}
+
+/* The slot/fan wrappers stay axis-aligned while the card inside rotates, so
+   their boxes cover visible parts of neighbouring cards. Make the wrappers
+   click-transparent: only the card faces themselves are hit targets. */
+.hand-card-slot,
+.hand-card-fan {
+  pointer-events: none;
 }
 
 /* --------------------------------------------------------------------------
