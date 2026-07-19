@@ -63,3 +63,7 @@ The UI codes against the `GameController` interface only, so it runs on either t
 real engine controller or the built-in mock (`src/ui/mocks.ts`).
 
 Visual QA screenshots land in `qa/` (git-ignored).
+
+## License
+
+[MIT](LICENSE) © Morgan Allen
